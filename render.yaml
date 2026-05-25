@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: lora-simulator
+    env: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn lora_project.wsgi:application"
+    envVars:
+      - key: DEBUG
+        value: false
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ALLOWED_HOSTS
+        value: "*.render.com"
