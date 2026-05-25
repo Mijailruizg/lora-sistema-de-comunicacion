@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Cobertura LoRa &mdash; Modelo Híbrido</title>
+    <meta name="description"
+        content="Simulador de radioenlace LoRa con modelo híbrido FSPL, análisis de Fresnel y detección automática de entorno.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'simulator/css/style.css' %}">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #eef2f7;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            color: #1e293b;
+        }
+
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+
+        .navbar-pro {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+            border-bottom: 1px solid rgba(99, 179, 237, 0.15);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+            padding: 10px 20px;
+        }
+
+        .navbar-pro .navbar-brand {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: #f0f9ff !important;
+        }
+
+        .navbar-pro .nav-subtitle {
+            font-size: 0.72rem;
+            color: #7fb3d3;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .navbar-version {
+            background: #2563eb;
+            color: #eff6ff;
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .sidebar-card {
+            border: 1px solid #dde3ef;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+            background: #ffffff;
+            overflow: hidden;
+            transition: box-shadow 0.2s;
+        }
+
+        .sidebar-card:hover {
+            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.10);
+        }
+
+        .sidebar-card .card-header {
+            background: #f8fafd;
+            color: #334155;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 10px 14px;
+            border-bottom: 1px solid #e8edf5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-card .card-header i {
+            color: #3b82f6;
+            font-size: 0.9em;
+        }
+
+        .field-label {
+            font-size: 0.67rem;
+            font-weight: 600;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .form-control,
+        .form-select {
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            font-size: 0.83rem;
+            color: #1e293b;
+            background: #fafbfd;
+            transition: border-color 0.15s, box-shadow 0.15s;
+            box-shadow: none;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+            background: #fff;
+        }
+
+        .input-group-text {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #475569;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .btn-simulate {
+            background: linear-gradient(135deg, #059669, #10b981);
+            border: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            letter-spacing: 0.3px;
+            color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(16, 185, 129, 0.25);
+            transition: all 0.2s;
+        }
+
+        .btn-simulate:hover:not(:disabled) {
+            background: linear-gradient(135deg, #047857, #059669);
+            box-shadow: 0 5px 14px rgba(16, 185, 129, 0.35);
+            transform: translateY(-1px);
+            color: #fff;
+        }
+
+        .btn-simulate:disabled {
+            background: #94a3b8;
+            box-shadow: none;
+            color: #e2e8f0;
+        }
+
+        .btn-reset {
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            font-size: 0.82rem;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-reset:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+            color: #475569;
+        }
+
+        .section-divider {
+            border: none;
+            border-top: 1px dashed #dde3ef;
+            margin: 12px 0;
+        }
+
+        .freq-hint {
+            font-size: 0.68rem;
+            color: #3b82f6;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+
+        .env-hint-text {
+            font-size: 0.68rem;
+            color: #64748b;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+
+        .env-box {
+            border-radius: 6px;
+            padding: 8px 10px;
+            border: 1px solid #dde3ef;
+            background: #f8fafd;
+        }
+
+        .env-box.env-rural {
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+
+        .env-box.env-suburbano {
+            background: #faf5ff;
+            border-color: #c084fc;
+        }
+
+        .env-box.env-bosque {
+            background: #f0fdf4;
+            border-color: #4ade80;
+        }
+
+        .env-box.env-urbano {
+            background: #fffbeb;
+            border-color: #fcd34d;
+        }
+
+        .results-card .card-header {
+            background: linear-gradient(135deg, #1e3a5f, #1d4ed8);
+            color: #f0f9ff;
+            border-bottom: none;
+        }
+
+        .results-card .card-header i {
+            color: #93c5fd;
+        }
+
+        .stat-label {
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .stat-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+
+        .stat-box {
+            border-right: 1px solid #e2e8f0;
+            padding: 10px 0;
+        }
+
+        .stat-box:last-child {
+            border-right: none;
+        }
+
+        #res-status-box {
+            border-radius: 8px;
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .status-ok {
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+        }
+
+        .status-fail {
+            background: #fff1f2;
+            border-left: 4px solid #f43f5e;
+        }
+
+        .env-result-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .env-metric-label {
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #94a3b8;
+        }
+
+        .env-metric-value {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .elevation-card .card-header {
+            background: #f8fafd;
+        }
+
+        .history-card .card-header {
+            background: #f8fafd;
+        }
+
+        .history-item {
+            font-size: 0.76rem;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #475569;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-item:hover {
+            background: #f8fafc;
+        }
+
+        .badge-ok {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-fail {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        #map {
+            height: 86vh;
+            width: 100%;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .coord-point-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.73rem;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            color: #475569;
+        }
+
+        .coord-point-box.placed {
+            border-left: 3px solid #10b981;
+            background: #f0fdf4;
+            color: #065f46;
+        }
+
+        .coord-point-box.placed-rx {
+            border-left: 3px solid #f59e0b;
+            background: #fffbeb;
+            color: #92400e;
+        }
+
+        .coord-badge {
+            font-size: 0.6rem;
+            background: #e9ecef;
+            padding: 1px 5px;
+            border-radius: 3px;
+            color: #475569;
+        }
+
+        .coord-badge.rx {
+            background: #fff4e6;
+            color: #d9480f;
+        }
+
+        .loc-item {
+            padding: 9px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background 0.15s;
+        }
+
+        .loc-item:hover {
+            background: #f8fafc;
+        }
+
+        .loc-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .btn-xs {
+            padding: 2px 6px;
+            font-size: 0.65rem;
+            line-height: 1.5;
+            border-radius: 4px;
+        }
+
+        .text-success {
+            color: #059669 !important;
+        }
+
+        .text-danger {
+            color: #e11d48 !important;
+        }
+
+        .text-warning {
+            color: #d97706 !important;
+        }
+
+        .badge.bg-primary {
+            background-color: #2563eb !important;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-pro d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+            <div class="nav-icon-wrap">
+                <i class="fa-solid fa-satellite-dish" style="color:#60a5fa"></i>
+            </div>
+            <div>
+                <div class="navbar-brand mb-0">LoRa communication</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-3 pb-4 px-3">
+        <div class="row g-3">
+            <div class="col-md-4 col-lg-3">
+                <div class="card sidebar-card mb-2">
+                    <div class="card-header">
+                        <i class="fa-solid fa-sliders me-2"></i>Parametros del Enlace
+                    </div>
+                    <div class="card-body py-2 px-3">
+                        <form id="sim-form">
+                            <div class="mb-2">
+                                <div class="field-label">Frecuencia</div>
+                                <div class="input-group input-group-sm">
+                                    <select class="form-select form-select-sm" id="freq-preset" style="max-width:58%">
+                                        <option value="433" data-bw="125000">433 MHz &mdash; LoRa EU433</option>
+                                        <option value="470" data-bw="125000">470 MHz &mdash; LoRa CN470</option>
+                                        <option value="868" data-bw="125000">868 MHz &mdash; LoRa EU868</option>
+                                        <option value="915" selected data-bw="125000">915 MHz &mdash; LoRa LATAM
+                                        </option>
+                                        <option value="923" data-bw="125000">923 MHz &mdash; LoRa AS923</option>
+                                        <option value="2400" data-bw="250000">2400 MHz &mdash; LoRa 2.4 GHz</option>
+                                        <option value="custom" data-bw="">Personalizada...</option>
+                                    </select>
+                                    <input type="number" class="form-control form-control-sm" id="frequency" value="915"
+                                        min="100" max="6000" step="0.1">
+                                    <span class="input-group-text">MHz</span>
+                                </div>
+                                <div id="freq-hint" class="freq-hint">
+                                    <i class="fa-solid fa-circle-info me-1"></i>Balance estandar de penetracion y
+                                    alcance.
+                                </div>
+                            </div>
+
+                            <hr class="section-divider">
+                            <div class="row mb-2 g-2">
+                                <div class="col-6">
+                                    <div class="field-label">Potencia TX (dBm)</div>
+                                    <input type="number" class="form-control form-control-sm" id="tx_power" value="14"
+                                        required>
+                                </div>
+                                <div class="col-6">
+                                    <div class="field-label">Ganancia TX (dBi)</div>
+                                    <input type="number" class="form-control form-control-sm" id="tx_gain" value="2.15"
+                                        step="0.1" required>
+                                </div>
+                            </div>
+
+                            <div class="row mb-2 g-2">
+                                <div class="col-6">
+                                    <div class="field-label">Altura TX (m)</div>
+                                    <input type="number" class="form-control form-control-sm" id="ant_height_tx"
+                                        value="15" min="1" max="200" step="1"
+                                        title="Altura de antena TX sobre el suelo">
+                                </div>
+                                <div class="col-6">
+                                    <div class="field-label">Altura RX (m)</div>
+                                    <input type="number" class="form-control form-control-sm" id="ant_height_rx"
+                                        value="3" min="1" max="200" step="1" title="Altura de antena RX sobre el suelo">
+                                </div>
+                            </div>
+
+                            <div class="row mb-2 g-2">
+                                <div class="col-6">
+                                    <div class="field-label">Spreading Factor</div>
+                                    <select class="form-select form-select-sm" id="sf">
+                                        <option value="7">SF7 &mdash; Rapido (-123 dBm)</option>
+                                        <option value="8">SF8</option>
+                                        <option value="9">SF9</option>
+                                        <option value="10">SF10</option>
+                                        <option value="11">SF11</option>
+                                        <option value="12" selected>SF12 &mdash; Lento (-137 dBm)</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <div class="field-label">Bandwidth</div>
+                                    <select class="form-select form-select-sm" id="bw_hz">
+                                        <option value="125000" selected>125 kHz</option>
+                                        <option value="250000">250 kHz</option>
+                                        <option value="500000">500 kHz</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-2 g-2">
+                                <div class="col-6">
+                                    <div class="field-label">Ganancia RX (dBi)</div>
+                                    <input type="number" class="form-control form-control-sm" id="rx_gain" value="2.15"
+                                        step="0.1" required>
+                                </div>
+                                <div class="col-6">
+                                    <div class="field-label">Perdida Cables (dB)</div>
+                                    <input type="number" class="form-control form-control-sm" id="cable_loss"
+                                        value="2.0" step="0.1" required>
+                                </div>
+                            </div>
+
+                            <hr class="section-divider">
+                            <div class="mb-2" id="env-box">
+                                <div class="field-label d-flex align-items-center gap-2">
+                                    <i class="fa-solid fa-map-location-dot" style="color:#2a6496"></i>
+                                    Entorno de Propagacion
+                                    <span id="env-loading" class="spinner-border spinner-border-sm text-primary d-none"
+                                        role="status"></span>
+                                </div>
+                                <select class="form-select form-select-sm mt-1" id="environment">
+                                    <option value="Rural">Rural &mdash; Campo abierto / Sin edificios</option>
+                                    <option value="Suburbano">Suburbano &mdash; Residencial / Vegetacion baja</option>
+                                    <option value="Bosque">Bosque &mdash; Vegetacion densa</option>
+                                    <option value="Urbano">Urbano &mdash; Alta densidad de edificios</option>
+                                </select>
+                                <div id="env-hint" class="env-hint-text">
+                                    <i class="fa-solid fa-circle-dot me-1 text-secondary"></i>
+                                </div>
+                            </div>
+
+                            <button type="button" id="btn-simulate"
+                                class="btn btn-simulate btn-sm w-100 mb-1 text-white" disabled>
+                                <i class="fa-solid fa-bolt me-2"></i>Simular Enlace
+                            </button>
+                            <button type="button" id="btn-reset" class="btn btn-reset btn-sm w-100">
+                                <i class="fa-solid fa-trash-can me-1"></i>Limpiar Mapa
+                            </button>
+
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card sidebar-card mb-2">
+                    <div class="card-header">
+                        <i class="fa-solid fa-location-dot me-2"></i>Puntos de Ubicación
+                    </div>
+                    <div class="card-body py-2 px-3">
+                        <div class="mb-2">
+                            <div class="field-label">Coordenadas TX</div>
+                            <div id="loc-tx-display" class="coord-point-box">
+                                <i class="fa-solid fa-circle-xmark text-secondary me-1"></i>Sin seleccionar
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <div class="field-label">Coordenadas RX</div>
+                            <div id="loc-rx-display" class="coord-point-box">
+                                <i class="fa-solid fa-circle-xmark text-secondary me-1"></i>Sin seleccionar
+                            </div>
+                        </div>
+                        <div id="map-status-hint" class="env-hint-text text-center py-1 border rounded bg-light mb-2">
+                            <i class="fa-solid fa-hand-pointer me-1"></i>Clic para colocar TX
+                        </div>
+
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="text" id="loc-name" class="form-control" placeholder="Nombre de ubicación...">
+                            <button class="btn btn-primary" type="button" id="btn-save-loc" disabled>
+                                <i class="fa-solid fa-floppy-disk"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card sidebar-card mb-2">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="fa-solid fa-bookmark me-2"></i>Mis Ubicaciones</span>
+                        <span class="badge bg-primary" id="loc-count-badge">0</span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 200px; overflow-y: auto;">
+                        <ul id="loc-list" class="list-unstyled mb-0">
+                            <!-- Items will be rendered here -->
+                        </ul>
+                        <div id="loc-empty" class="text-center py-3 text-muted small">
+                            <i class="fa-solid fa-folder-open d-block mb-1 fs-4"></i>
+                            Sin ubicaciones guardadas
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card sidebar-card results-card mb-2 d-none" id="results-card">
+
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span class="text-white fw-bold"
+                            style="font-size:0.75rem; letter-spacing:1px; text-transform:uppercase">
+                            <i class="fa-solid fa-chart-line me-2"></i>Resultados
+                        </span>
+                        <span id="res-fresnel-badge" class="badge bg-secondary"
+                            style="font-size:0.68rem">Calculando...</span>
+                    </div>
+                    <div class="card-body py-2 px-2">
+                        <div class="row text-center mb-2 g-0">
+                            <div class="col-4 stat-box">
+                                <div class="stat-label">Distancia</div>
+                                <div id="res-distance" class="stat-value">--</div>
+                                <div style="font-size:0.62rem;color:#999">km</div>
+                            </div>
+                            <div class="col-4 stat-box">
+                                <div class="stat-label">Perdida</div>
+                                <div id="res-fspl" class="stat-value text-danger">--</div>
+                                <div style="font-size:0.62rem;color:#999">dB</div>
+                            </div>
+                            <div class="col-4 stat-box">
+                                <div class="stat-label">Senal RX</div>
+                                <div id="res-prx" class="stat-value text-success">--</div>
+                                <div style="font-size:0.62rem;color:#999">dBm</div>
+                            </div>
+                        </div>
+
+                        <div class="rounded p-2 mb-2 text-center" id="res-status-box"
+                            style="background:#f8f9fa; border:1px solid #dee2e6">
+                            <div id="res-status" class="fw-bold" style="font-size:0.85rem">--</div>
+                            <div id="res-margin" class="mt-1" style="font-size:0.68rem; color:#666">Margen: -- dB</div>
+                        </div>
+
+                        <div class="env-result-box p-2 mb-2">
+                            <div class="row text-center g-0">
+                                <div class="col-4" style="border-right:1px solid #e0e0e0">
+                                    <div class="env-metric-label">Entorno</div>
+                                    <div id="res-env-type" class="env-metric-value">--</div>
+                                </div>
+                                <div class="col-4" style="border-right:1px solid #e0e0e0">
+                                    <div class="env-metric-label">Perd. Entorno</div>
+                                    <div id="res-env-loss" class="env-metric-value text-warning">--</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="env-metric-label">Perd. Total</div>
+                                    <div id="res-env-total" class="env-metric-value text-danger">--</div>
+                                </div>
+                            </div>
+                            <div id="res-env-desc" class="text-center mt-1" style="font-size:0.65rem; color:#666">--
+                            </div>
+                        </div>
+
+                        <canvas id="prxChart" height="130"></canvas>
+                        <div class="text-center mt-2">
+                            <a id="btn-export-pdf" href="#" class="btn btn-sm btn-outline-danger d-none w-100"
+                                target="_blank">
+                                <i class="fa-solid fa-file-pdf me-1"></i>Exportar Informe PDF
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card sidebar-card elevation-card mb-2 d-none" id="elevation-card">
+                    <div class="card-header"
+                        style="font-size:0.72rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:8px 12px">
+                        <i class="fa-solid fa-mountain me-2"></i>Perfil de Elevacion (LOS)
+                    </div>
+                    <div class="card-body py-2 px-2">
+                        <canvas id="elevationChart" height="120"></canvas>
+                        <div class="text-muted text-center mt-1" style="font-size:0.62rem">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card sidebar-card history-card">
+                    <div class="card-header d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        Historial (Ultimas 10)
+                    </div>
+                    <ul class="list-group list-group-flush" id="history-list">
+                    </ul>
+                </div>
+
+            </div>
+
+            <div class="col-md-8 col-lg-9">
+                <div class="card sidebar-card h-100" style="min-height:88vh">
+                    <div class="card-header"
+                        style="font-size:0.72rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:8px 12px">
+                        <i class="fa-solid fa-map me-2" style="color:#7fb3d3"></i>Mapa de Cobertura
+                        <span class="float-end text-muted" style="font-size:0.65rem; font-weight:400; letter-spacing:0">
+                            <i class="fa-solid fa-location-crosshairs me-1"></i>
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{% static 'simulator/js/app.js' %}"></script>
+</body>
+
+</html>
